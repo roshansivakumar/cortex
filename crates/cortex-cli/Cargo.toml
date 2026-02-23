@@ -1,0 +1,22 @@
+[package]
+name = "cortex-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "cortex"
+path = "src/main.rs"
+
+[dependencies]
+cortex-core = { path = "../cortex-core" }
+cortex-daemon = { path = "../cortex-daemon" }
+clap = { version = "4", features = ["derive"] }
+tokio = { workspace = true }
+hyper = "1"
+hyper-util = "0.1"
+http-body-util = "0.1"
+serde_json = { workspace = true }
+colored = "3"
+cortex-embed = { path = "../cortex-embed" }
+dirs = "6"
+libc = "0.2"

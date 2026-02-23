@@ -1,0 +1,13 @@
+[package]
+name = "cortex-plugin-fs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cortex-core = { path = "../../crates/cortex-core" }
+notify = "7"
+notify-debouncer-mini = "0.5"
+tokenizers = "0.21"
+tracing = { workspace = true }
+uuid = { workspace = true }
+crossbeam-channel = { workspace = true }

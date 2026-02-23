@@ -1,0 +1,17 @@
+[package]
+name = "cortex-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cortex-core = { path = "../cortex-core" }
+cortex-store = { path = "../cortex-store" }
+cortex-embed = { path = "../cortex-embed" }
+axum = "0.8"
+tokio = { workspace = true }
+tower = "0.5"
+hyper = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+crossbeam-channel = { workspace = true }

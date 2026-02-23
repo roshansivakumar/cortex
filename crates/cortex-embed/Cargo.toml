@@ -1,0 +1,12 @@
+[package]
+name = "cortex-embed"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cortex-core = { path = "../cortex-core" }
+ort = { version = "2.0.0-rc.11", features = ["download-binaries"] }
+tokenizers = "0.21"
+ndarray = "0.16"
+reqwest = { version = "0.12", features = ["blocking"] }
+tracing = { workspace = true }

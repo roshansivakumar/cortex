@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/cortex-core",
+    "crates/cortex-store",
+    "crates/cortex-embed",
+    "crates/cortex-daemon",
+    "crates/cortex-api",
+    "crates/cortex-cli",
+    "plugins/cortex-plugin-fs",
+]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v7"] }
+blake3 = "1"
+crossbeam-channel = "0.5"
