@@ -47,9 +47,21 @@ impl FsWatcherPlugin {
     }
 
     fn scan_directory(&self, dir: &Path, sender: &Sender<DocumentEvent>) -> Result<()> {
-        let entries = std::fs::read_dir(dir)?;
+        let entries = match std::fs::read_dir(dir) {
+            Ok(entries) => entries,
+            Err(e) => {
+                tracing::warn!("Cannot read directory {}: {e}", dir.display());
+                return Ok(());
+            }
+        };
         for entry in entries {
-            let entry = entry?;
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    tracing::warn!("Cannot read entry in {}: {e}", dir.display());
+                    continue;
+                }
+            };
             let path = entry.path();
 
             if reader::should_ignore(&path, &self.ignore_patterns) {
