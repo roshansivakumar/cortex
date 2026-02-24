@@ -88,6 +88,19 @@ fn process_event(
             }
         }
         DocumentEvent::Created(_) | DocumentEvent::Modified(_) => {
+            // Skip files larger than 1MB — likely generated/minified content
+            const MAX_FILE_SIZE: u64 = 1_000_000;
+            if let Ok(meta) = std::fs::metadata(path) {
+                if meta.len() > MAX_FILE_SIZE {
+                    tracing::debug!(
+                        "Skipping large file ({} bytes): {}",
+                        meta.len(),
+                        path.display()
+                    );
+                    return Ok(());
+                }
+            }
+
             // Read the document
             let doc = plugin.read_document(path)?;
 
