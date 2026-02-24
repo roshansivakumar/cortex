@@ -90,6 +90,46 @@ impl FsWatcherPlugin {
     }
 }
 
+impl FsWatcherPlugin {
+    /// Recursively register non-recursive watches on real (non-symlink) directories,
+    /// skipping ignored paths. This avoids notify following symlinks into system dirs.
+    fn watch_directory_tree(
+        &self,
+        watcher: &mut notify::RecommendedWatcher,
+        dir: &Path,
+    ) -> Result<()> {
+        // Skip symlinks
+        if dir.symlink_metadata().map(|m| m.is_symlink()).unwrap_or(false) {
+            return Ok(());
+        }
+
+        // Watch this directory (non-recursive)
+        if let Err(e) = watcher.watch(dir, RecursiveMode::NonRecursive) {
+            tracing::warn!("Cannot watch {}: {e}", dir.display());
+            return Ok(());
+        }
+
+        // Recurse into real subdirectories
+        let entries = match std::fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => return Ok(()),
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            if reader::should_ignore(&path, &self.ignore_patterns) {
+                continue;
+            }
+            self.watch_directory_tree(watcher, &path)?;
+        }
+
+        Ok(())
+    }
+}
+
 impl Plugin for FsWatcherPlugin {
     fn name(&self) -> &str {
         "fs-watcher"
@@ -142,17 +182,12 @@ impl Plugin for FsWatcherPlugin {
         })
         .map_err(|e| CortexError::Plugin(format!("Failed to create watcher: {e}")))?;
 
-        // Watch all configured paths
+        // Watch directories individually (non-recursive) to avoid following
+        // symlinks into system directories. We register each real subdirectory
+        // that passes our ignore/symlink filters.
         for path in &self.watch_paths {
             if path.exists() {
-                watcher
-                    .watch(path, RecursiveMode::Recursive)
-                    .map_err(|e| {
-                        CortexError::Plugin(format!(
-                            "Failed to watch {}: {e}",
-                            path.display()
-                        ))
-                    })?;
+                self.watch_directory_tree(&mut watcher, path)?;
                 tracing::info!("Watching: {}", path.display());
             }
         }
