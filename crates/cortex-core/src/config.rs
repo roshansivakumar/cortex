@@ -89,12 +89,10 @@ fn default_overlap_tokens() -> usize {
 }
 
 fn default_extensions() -> Vec<String> {
-    vec![
-        ".md", ".txt", ".rs", ".py", ".js", ".ts", ".go", ".toml", ".yaml", ".yml", ".json",
-    ]
-    .into_iter()
-    .map(String::from)
-    .collect()
+    vec![".md", ".txt", ".rs", ".py", ".js", ".ts", ".go"]
+        .into_iter()
+        .map(String::from)
+        .collect()
 }
 
 fn default_ignore_patterns() -> Vec<String> {
