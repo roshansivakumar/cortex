@@ -65,14 +65,8 @@ impl Chunker for ParagraphChunker {
                     chunk_index,
                 ));
 
-                // Start new chunk with overlap
-                let overlap_start = if current_text.len() > self.overlap_chars {
-                    current_text.len() - self.overlap_chars
-                } else {
-                    0
-                };
-                // Find a word boundary for the overlap
-                let overlap_text = find_word_boundary(&current_text[overlap_start..]);
+                // Start new chunk with overlap (char-safe)
+                let overlap_text = safe_tail(&current_text, self.overlap_chars);
 
                 chunk_start_offset = current_byte_offset;
                 if overlap_text.is_empty() {
@@ -130,37 +124,64 @@ fn make_chunk(doc_id: &str, content: &str, byte_offset: usize, chunk_index: u32)
     }
 }
 
-fn find_word_boundary(text: &str) -> &str {
-    // Find the first space and start from there for a clean word boundary
-    if let Some(pos) = text.find(' ') {
-        &text[pos + 1..]
+/// Get the last `n` chars of a string, starting at a word boundary.
+fn safe_tail(text: &str, n: usize) -> &str {
+    let char_count = text.chars().count();
+    if char_count <= n {
+        return text;
+    }
+    let skip = char_count - n;
+    let byte_offset = text.char_indices().nth(skip).map(|(i, _)| i).unwrap_or(0);
+    let tail = &text[byte_offset..];
+    // Snap to next word boundary
+    if let Some(pos) = tail.find(' ') {
+        &tail[pos + 1..]
     } else {
-        text
+        tail
     }
 }
 
 fn split_large_text(doc_id: &str, text: &str, max_chars: usize, idx: &mut u32) -> Vec<Chunk> {
     let mut chunks = Vec::new();
-    let mut start = 0;
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
+    let total = chars.len();
+    let mut char_start = 0;
 
-    while start < text.len() {
-        let end = (start + max_chars).min(text.len());
+    while char_start < total {
+        let char_end = (char_start + max_chars).min(total);
+        let byte_start = chars[char_start].0;
+
         // Try to break at a sentence boundary
-        let actual_end = if end < text.len() {
-            text[start..end]
-                .rfind(". ")
-                .map(|p| start + p + 2)
-                .unwrap_or(end)
+        let actual_char_end = if char_end < total {
+            let byte_end = chars[char_end].0;
+            let window = &text[byte_start..byte_end];
+            if let Some(p) = window.rfind(". ") {
+                // Find which char index corresponds to this byte position
+                let sentence_byte = byte_start + p + 2;
+                chars[char_start..char_end]
+                    .iter()
+                    .position(|(b, _)| *b >= sentence_byte)
+                    .map(|i| char_start + i)
+                    .unwrap_or(char_end)
+            } else {
+                char_end
+            }
         } else {
-            end
+            char_end
         };
 
-        let slice = &text[start..actual_end];
+        let byte_end = if actual_char_end < total {
+            chars[actual_char_end].0
+        } else {
+            text.len()
+        };
+
+        let slice = &text[byte_start..byte_end];
         if !slice.trim().is_empty() {
-            chunks.push(make_chunk(doc_id, slice.trim(), start, *idx));
+            chunks.push(make_chunk(doc_id, slice.trim(), byte_start, *idx));
             *idx += 1;
         }
-        start = actual_end;
+        char_start = actual_char_end;
     }
 
     chunks
