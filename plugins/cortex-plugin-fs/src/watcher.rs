@@ -41,12 +41,24 @@ impl FsWatcherPlugin {
                 tracing::warn!("Watch path does not exist: {}", watch_path.display());
                 continue;
             }
-            self.scan_directory(watch_path, sender)?;
+            self.scan_directory(watch_path, sender, 0)?;
         }
         Ok(())
     }
 
-    fn scan_directory(&self, dir: &Path, sender: &Sender<DocumentEvent>) -> Result<()> {
+    fn scan_directory(&self, dir: &Path, sender: &Sender<DocumentEvent>, depth: usize) -> Result<()> {
+        const MAX_DEPTH: usize = 20;
+        if depth > MAX_DEPTH {
+            tracing::debug!("Max depth reached, skipping: {}", dir.display());
+            return Ok(());
+        }
+
+        // Skip symlinks to avoid recursive loops
+        if dir.symlink_metadata().map(|m| m.is_symlink()).unwrap_or(false) {
+            tracing::debug!("Skipping symlink: {}", dir.display());
+            return Ok(());
+        }
+
         let entries = match std::fs::read_dir(dir) {
             Ok(entries) => entries,
             Err(e) => {
@@ -69,7 +81,7 @@ impl FsWatcherPlugin {
             }
 
             if path.is_dir() {
-                self.scan_directory(&path, sender)?;
+                self.scan_directory(&path, sender, depth + 1)?;
             } else if reader::has_allowed_extension(&path, &self.extensions) {
                 let _ = sender.send(DocumentEvent::Created(path));
             }

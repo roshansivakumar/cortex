@@ -98,10 +98,14 @@ fn default_extensions() -> Vec<String> {
 }
 
 fn default_ignore_patterns() -> Vec<String> {
-    vec!["node_modules", ".git", "target", "__pycache__", ".venv"]
-        .into_iter()
-        .map(String::from)
-        .collect()
+    vec![
+        "node_modules", ".git", "target", "__pycache__", ".venv",
+        "dosdevices", ".wine", ".cache", ".local/share/Trash",
+        "vendor", "dist", "build", ".next", ".nuxt",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect()
 }
 
 // --- Impl ---
