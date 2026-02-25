@@ -67,7 +67,34 @@ impl Daemon {
         // Set up event channel
         let (sender, receiver) = crossbeam_channel::unbounded();
 
-        // Initialize and start the FS plugin
+        // Cancellation token for graceful shutdown
+        let cancel = CancellationToken::new();
+
+        // Build and start API server FIRST so CLI can connect immediately
+        let app_state = cortex_api::server::AppState {
+            store: store.clone(),
+            embedder: embedder.clone(),
+            config: Arc::new(self.config.clone()),
+            start_time: Instant::now(),
+            ingest_sender: sender.clone(),
+        };
+
+        let app = cortex_api::server::build_router(app_state);
+
+        // Bind TCP listener (default port 9723 if none configured)
+        let port = self.config.api.tcp_port.unwrap_or(9723);
+        let tcp_listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}"))
+            .await
+            .map_err(cortex_core::error::CortexError::Io)?;
+        tracing::info!("API listening on: http://127.0.0.1:{port}");
+
+        // Write socket info so CLI knows where to connect
+        let socket_path = self.config.socket_path();
+        std::fs::write(&socket_path, port.to_string())?;
+
+        tracing::info!("Cortex daemon ready. Starting indexing...");
+
+        // Start the FS plugin (does initial scan, then watches for changes)
         let mut fs_plugin = FsWatcherPlugin::new(
             self.config.watch.paths.clone(),
             self.config.watch.extensions.clone(),
@@ -77,9 +104,6 @@ impl Daemon {
         let plugin: Arc<dyn Plugin> = Arc::new(FsWatcherPluginHandle {
             name: "fs-watcher".to_string(),
         });
-
-        // Cancellation token for graceful shutdown
-        let cancel = CancellationToken::new();
 
         // Start ingestion pipeline in background
         let ingestion_cancel = cancel.clone();
@@ -99,30 +123,6 @@ impl Daemon {
                 ingestion_cancel,
             ));
         });
-
-        // Build and start API server
-        let app_state = cortex_api::server::AppState {
-            store: store.clone(),
-            embedder: embedder.clone(),
-            config: Arc::new(self.config.clone()),
-            start_time: Instant::now(),
-            ingest_sender: sender,
-        };
-
-        let app = cortex_api::server::build_router(app_state);
-
-        // Bind TCP listener (default port 9723 if none configured)
-        let port = self.config.api.tcp_port.unwrap_or(9723);
-        let tcp_listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}"))
-            .await
-            .map_err(cortex_core::error::CortexError::Io)?;
-        tracing::info!("API listening on: http://127.0.0.1:{port}");
-
-        // Write socket info so CLI knows where to connect
-        let socket_path = self.config.socket_path();
-        std::fs::write(&socket_path, port.to_string())?;
-
-        tracing::info!("Cortex daemon ready.");
 
         // Wait for shutdown signal
         let shutdown_cancel = cancel.clone();
